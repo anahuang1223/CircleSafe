@@ -8,6 +8,7 @@ struct Incident: Codable, Identifiable {
     let severity: String
     let source: String
     let location: IncidentLocation
+    let locationContext: LocationContext?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -16,6 +17,7 @@ struct Incident: Codable, Identifiable {
         case severity
         case source
         case location
+        case locationContext
     }
 }
 
@@ -29,4 +31,9 @@ struct IncidentLocation: Codable {
             longitude: coordinates[0]
         )
     }
+}
+
+struct LocationContext: Codable {
+    let areaType: String
+    let context: String
 }

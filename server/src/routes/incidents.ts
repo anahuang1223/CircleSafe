@@ -36,6 +36,32 @@ router.post("/analyze", async (req, res) => {
     const result = await db
       .collection("incidents")
       .insertOne(incident);
+    
+    // Run Gemini enrichment in the background.
+    // Do NOT make the iPhone wait for it.
+    analyzeLocationContext(
+      latitude,
+      longitude,
+      "Selected incident location"
+    )
+      .then(async (locationContext) => {
+        await db.collection("incidents").updateOne(
+          { _id: result.insertedId },
+          {
+            $set: {
+              locationContext
+            }
+          }
+        );
+
+        console.log("✅ Gemini location context added");
+      })
+      .catch((error) => {
+        console.error(
+          "⚠️ Gemini enrichment failed, report still saved:",
+          error
+        );
+      });
 
     res.json({
       _id: result.insertedId,

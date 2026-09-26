@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var incidents: [Incident] = []
     @State private var selectedIncident: Incident?
     @State private var showingReport = false
+    @State private var showingCircle = false
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(
@@ -58,6 +59,7 @@ struct ContentView: View {
                     Spacer()
 
                     Button {
+                        showingCircle = true
                     } label: {
                         Image(systemName: "person.2.fill")
                             .padding(12)
@@ -113,6 +115,9 @@ struct ContentView: View {
                 incidents.insert(newIncident, at: 0)
             }
         }
+        .sheet(isPresented: $showingCircle) {
+            CircleView()
+        }
     }
 }
 
@@ -135,6 +140,22 @@ struct IncidentDetailView: View {
 
             Divider()
 
+            if let locationContext = incident.locationContext {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Location Context", systemImage: "location.fill")
+                        .font(.headline)
+
+                    Text(locationContext.areaType)
+                        .fontWeight(.semibold)
+
+                    Text(locationContext.context)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+            }
+            
             HStack {
                 Label(
                     incident.severity.capitalized,
