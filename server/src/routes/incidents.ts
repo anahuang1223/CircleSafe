@@ -7,7 +7,7 @@ const router = Router();
 // Analyze AND save a friend's report
 router.post("/analyze", async (req, res) => {
   try {
-    const { report, latitude, longitude } = req.body;
+    const { report, latitude, longitude, circleId } = req.body;
 
     if (!report) {
       return res.status(400).json({
@@ -24,6 +24,7 @@ router.post("/analyze", async (req, res) => {
       originalReport: report,
       ...analysis,
       source: "circle",
+      circleId,
       location: {
         type: "Point",
         coordinates: [longitude, latitude]
@@ -77,13 +78,19 @@ router.post("/analyze", async (req, res) => {
 });
 
 // Get all incidents
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  const circleId = req.query.circleId as string;
   try {
     const db = getDB();
 
     const incidents = await db
       .collection("incidents")
-      .find({"location.coordinates": { $exists: true }})
+      .find({"location.coordinates": { $exists: true },
+        $or: [
+          { circleId },
+          { circleId: { $exists: false } }
+        ]
+      })
       .sort({ createdAt: -1 })
       .toArray();
 

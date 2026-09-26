@@ -7,7 +7,7 @@ class APIService {
     private let baseURL = "http://10.66.32.205:3000"
 
     func fetchIncidents() async throws -> [Incident] {
-        guard let url = URL(string: "\(baseURL)/api/incidents") else {
+        guard let url = URL(string: "\(baseURL)/api/incidents?circleId=roommates-demo") else {
             throw URLError(.badURL)
         }
 
@@ -34,7 +34,8 @@ class APIService {
         let body: [String: Any] = [
             "report": report,
             "latitude": latitude,
-            "longitude": longitude
+            "longitude": longitude,
+            "circleId": "roommates-demo"
         ]
 
         var request = URLRequest(url: url)

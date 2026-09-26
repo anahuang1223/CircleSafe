@@ -270,6 +270,33 @@ struct ReportView: View {
                     Text(errorMessage)
                         .foregroundStyle(.red)
                 }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Share with")
+                        .font(.headline)
+
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .foregroundStyle(.blue)
+
+                        VStack(alignment: .leading) {
+                            Text("Roommates")
+                                .fontWeight(.semibold)
+
+                            Text("3 members")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.blue)
+                    }
+                    .padding()
+                    .background(.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
 
                 Button {
                     submit()
