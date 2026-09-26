@@ -4,10 +4,28 @@ import express from "express";
 import cors from "cors";
 import { connectDB } from "./db/mongodb.js";
 import incidentRoutes from "./routes/incidents.js";
+import { analyzeLocationContext } from "./services/gemini.js";
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.get("/test-gemini", async (_req, res) => {
+  try {
+    const result = await analyzeLocationContext(
+      33.7765,
+      -84.3895,
+      "Tech Square, Atlanta, GA"
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error("Gemini error:", error);
+
+    res.status(500).json({
+      error: "Gemini test failed"
+    });
+  }
+});
 app.use("/api/incidents", incidentRoutes);
 app.get("/", (_req, res) => {
   res.json({

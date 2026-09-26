@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { analyzeSafetyReport } from "../services/openai.js";
 import { getDB } from "../db/mongodb.js";
-
+import { analyzeLocationContext } from "../services/gemini.js";
 const router = Router();
 
 // Analyze AND save a friend's report
 router.post("/analyze", async (req, res) => {
   try {
-    const { report } = req.body;
+    const { report, latitude, longitude } = req.body;
 
     if (!report) {
       return res.status(400).json({
@@ -16,11 +16,18 @@ router.post("/analyze", async (req, res) => {
     }
 
     const analysis = await analyzeSafetyReport(report);
+    let locationContext = null;
+
+    
 
     const incident = {
       originalReport: report,
       ...analysis,
       source: "circle",
+      location: {
+        type: "Point",
+        coordinates: [longitude, latitude]
+      },
       createdAt: new Date(),
     };
 
@@ -50,7 +57,7 @@ router.get("/", async (_req, res) => {
 
     const incidents = await db
       .collection("incidents")
-      .find({})
+      .find({"location.coordinates": { $exists: true }})
       .sort({ createdAt: -1 })
       .toArray();
 
