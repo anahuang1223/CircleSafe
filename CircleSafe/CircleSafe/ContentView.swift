@@ -5,6 +5,7 @@ import CoreLocation
 struct ContentView: View {
     @State private var incidents: [Incident] = []
     @State private var selectedIncident: Incident?
+    @State private var refreshTask: Task<Void, Never>?
     @State private var showingReport = false
     @State private var showingCircle = false
     @State private var position: MapCameraPosition = .region(
@@ -99,11 +100,20 @@ struct ContentView: View {
             }
         }
         .task {
-            do {
-                incidents = try await APIService.shared.fetchIncidents()
-                print("✅ Loaded \(incidents.count) incidents")
-            } catch {
-                print("❌ Failed to load incidents:", error)
+            while !Task.isCancelled {
+                do {
+                    let latestIncidents = try await APIService.shared.fetchIncidents()
+
+                    await MainActor.run {
+                        incidents = latestIncidents
+                    }
+
+                    print("🔄 Refreshed: \(latestIncidents.count) incidents")
+                } catch {
+                    print("❌ Failed to refresh incidents:", error)
+                }
+
+                try? await Task.sleep(for: .seconds(5))
             }
         }
         .sheet(item: $selectedIncident) { incident in
