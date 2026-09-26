@@ -8,6 +8,11 @@ struct ContentView: View {
     @State private var refreshTask: Task<Void, Never>?
     @State private var showingReport = false
     @State private var showingCircle = false
+    @State private var isWatchActive = false
+    @State private var showingWatchSession = false
+    @State private var activeWatchSession: WatchSession?
+    @State private var myWatchSessionId: String?
+    @State private var showingWatcherView = false
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(
@@ -20,7 +25,7 @@ struct ContentView: View {
             )
         )
     )
-
+    
     var body: some View {
         ZStack {
             Map(position: $position) {
@@ -44,7 +49,7 @@ struct ContentView: View {
                 }
             }
             .ignoresSafeArea()
-
+            
             VStack {
                 
                 HStack {
@@ -52,14 +57,14 @@ struct ContentView: View {
                         Text("CircleSafe")
                             .font(.title2)
                             .fontWeight(.bold)
-
+                        
                         Text("Atlanta")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-
+                    
                     Spacer()
-
+                    
                     Button {
                         showingCircle = true
                     } label: {
@@ -70,9 +75,9 @@ struct ContentView: View {
                     }
                 }
                 .padding()
-
+                
                 Spacer()
-
+                
                 HStack(spacing: 12) {
                     Button {
                         showingReport = true
@@ -86,8 +91,24 @@ struct ContentView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
-
+                    
                     Button {
+                        Task {
+                            do {
+                                let session = try await APIService.shared.startWatch()
+
+                                await MainActor.run {
+                                    activeWatchSession = session
+                                    myWatchSessionId = session.id
+                                    isWatchActive = true
+                                    showingWatchSession = true
+                                }
+
+                                print("Watch session started")
+                            } catch {
+                                print("Failed to start Watch session:", error)
+                            }
+                        }
                     } label: {
                         Label("Watch Me", systemImage: "shield.fill")
                             .frame(maxWidth: .infinity)
@@ -97,18 +118,42 @@ struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
-                .padding()
+                if let session = activeWatchSession,
+                   session.id != myWatchSessionId {
+
+                    Button {
+                        showingWatcherView = true
+                    } label: {
+                        Label(
+                            "Circle member is using Watch Me",
+                            systemImage: "eye.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
+            .padding()
         }
         .task {
             while !Task.isCancelled {
                 do {
                     incidents = try await APIService.shared.fetchIncidents()
+                    let watchSession = try await APIService.shared.fetchActiveWatch()
+                    
+                    if watchSession?.id != activeWatchSession?.id {
+                        activeWatchSession = watchSession
+                        // The other person ended Watch Me
+                        if watchSession == nil {
+                            showingWatcherView = false
+                        }
+                    }
                     print("Refreshed \(incidents.count) incidents")
                 } catch {
                     print("Failed to refresh incidents:", error)
                 }
-
+                
                 do {
                     try await Task.sleep(for: .seconds(5))
                 } catch {
@@ -133,6 +178,107 @@ struct ContentView: View {
         .sheet(isPresented: $showingCircle) {
             CircleView()
         }
+        .sheet(isPresented: $showingWatchSession) {
+            if let session = activeWatchSession {
+                WatchSessionView(
+                    session: session,
+                    isWatchActive: $isWatchActive,
+                    activeWatchSession: $activeWatchSession,
+                    myWatchSessionId: $myWatchSessionId
+                )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .sheet(isPresented: $showingWatcherView) {
+            if let session = activeWatchSession {
+                WatcherView(session: session)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+}
+struct WatchSessionView: View {
+    let session: WatchSession
+    @Binding var isWatchActive: Bool
+    @Binding var activeWatchSession: WatchSession?
+    @Binding var myWatchSessionId: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "shield.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.blue)
+
+            Text("Watch Me Active")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Text("Your safety session is active.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+
+            Button(role: .destructive) {
+                Task {
+                    do {
+                        try await APIService.shared.endWatch(
+                            sessionId: session.id
+                        )
+
+                        await MainActor.run {
+                            isWatchActive = false
+                            activeWatchSession = nil
+                            myWatchSessionId = nil
+                            dismiss()
+                        }
+
+                        print("Watch session ended")
+                    } catch {
+                        print("Failed to end Watch session:", error)
+                    }
+                }
+            } label: {
+                Text("End Watch")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+    }
+}
+struct WatcherView: View {
+    let session: WatchSession
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "eye.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.blue)
+
+            Text("Watching Circle Member")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Text("Their live location will appear here while Watch Me is active.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+
+            Button("Done") {
+                dismiss()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(24)
     }
 }
 

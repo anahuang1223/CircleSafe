@@ -87,4 +87,59 @@ class APIService {
             throw URLError(.badServerResponse)
         }
     }
+    func startWatch() async throws -> WatchSession {
+        guard let url = URL(string: "\(baseURL)/api/watch/start") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        return try JSONDecoder().decode(WatchSession.self, from: data)
+    }
+
+    func fetchActiveWatch() async throws -> WatchSession? {
+        guard let url = URL(string: "\(baseURL)/api/watch/active") else {
+            throw URLError(.badURL)
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Backend returns null when nobody is being watched
+        if String(data: data, encoding: .utf8) == "null" {
+            return nil
+        }
+
+        return try JSONDecoder().decode(WatchSession.self, from: data)
+    }
+
+    func endWatch(sessionId: String) async throws {
+        guard let url = URL(
+            string: "\(baseURL)/api/watch/\(sessionId)/end"
+        ) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
 }

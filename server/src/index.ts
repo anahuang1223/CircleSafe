@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { connectDB } from "./db/mongodb.js";
 import incidentRoutes from "./routes/incidents.js";
+import watchRoutes from "./routes/watch.js";
 import { analyzeLocationContext } from "./services/gemini.js";
 const app = express();
 
@@ -27,6 +28,7 @@ app.get("/test-gemini", async (_req, res) => {
   }
 });
 app.use("/api/incidents", incidentRoutes);
+app.use("/api/watch", watchRoutes);
 app.get("/", (_req, res) => {
   res.json({
     app: "CircleSafe",
@@ -45,10 +47,10 @@ async function startServer() {
     await connectDB();
 
     app.listen(PORT, () => {
-      console.log(`🚀 CircleSafe API running on http://localhost:${PORT}`);
+      console.log(`CircleSafe API running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("❌ Failed to start CircleSafe:", error);
+    console.error("Failed to start CircleSafe:", error);
     process.exit(1);
   }
 }
