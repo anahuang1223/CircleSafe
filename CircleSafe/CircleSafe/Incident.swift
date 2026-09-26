@@ -9,6 +9,8 @@ struct Incident: Codable, Identifiable {
     let source: String
     let location: IncidentLocation
     let locationContext: LocationContext?
+    let nearbyCount: Int?
+    let thanksCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -18,6 +20,8 @@ struct Incident: Codable, Identifiable {
         case source
         case location
         case locationContext
+        case nearbyCount
+        case thanksCount
     }
 }
 

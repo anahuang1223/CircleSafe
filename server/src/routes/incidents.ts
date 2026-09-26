@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ObjectId } from "mongodb";
 import { analyzeSafetyReport } from "../services/openai.js";
 import { getDB } from "../db/mongodb.js";
 import { analyzeLocationContext } from "../services/gemini.js";
@@ -103,5 +104,58 @@ router.get("/", async (req, res) => {
     });
   }
 });
+// Circle member marks themselves as nearby
+router.post("/:id/nearby", async (req, res) => {
+  
+  try {
+    const { id } = req.params;
+    const db = getDB();
+    const result = await db.collection("incidents").findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $inc: { nearbyCount: 1 } },
+      { returnDocument: "after" }
+    );
 
+    if (!result) {
+      return res.status(404).json({
+        error: "Incident not found"
+      });
+    } 
+
+    res.json(result);
+  } catch (error) {
+    console.error("Failed to mark nearby:", error);
+
+    res.status(500).json({
+      error: "Failed to mark nearby"
+    });
+  }
+});
+// Circle member thanks the reporter
+router.post("/:id/thanks", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getDB();
+
+    const result = await db.collection("incidents").findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $inc: { thanksCount: 1 } },
+      { returnDocument: "after" }
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        error: "Incident not found"
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Failed to send thanks:", error);
+
+    res.status(500).json({
+      error: "Failed to send thanks"
+    });
+  }
+});
 export default router;

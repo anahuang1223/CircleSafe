@@ -46,6 +46,7 @@ struct ContentView: View {
             .ignoresSafeArea()
 
             VStack {
+                
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("CircleSafe")
@@ -102,23 +103,27 @@ struct ContentView: View {
         .task {
             while !Task.isCancelled {
                 do {
-                    let latestIncidents = try await APIService.shared.fetchIncidents()
-
-                    await MainActor.run {
-                        incidents = latestIncidents
-                    }
-
-                    print("🔄 Refreshed: \(latestIncidents.count) incidents")
+                    incidents = try await APIService.shared.fetchIncidents()
+                    print("Refreshed \(incidents.count) incidents")
                 } catch {
-                    print("❌ Failed to refresh incidents:", error)
+                    print("Failed to refresh incidents:", error)
                 }
 
-                try? await Task.sleep(for: .seconds(5))
+                do {
+                    try await Task.sleep(for: .seconds(5))
+                } catch {
+                    break
+                }
             }
         }
-        .sheet(item: $selectedIncident) { incident in
-            IncidentDetailView(incident: incident)
-                .presentationDetents([.medium])
+        .sheet(item: $selectedIncident) { selected in
+            if let index = incidents.firstIndex(where: { $0.id == selected.id }) {
+                IncidentDetailView(incident: $incidents[index])
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            } else {
+                Text("Incident unavailable")
+            }
         }
         .sheet(isPresented: $showingReport) {
             ReportView { newIncident in
@@ -132,7 +137,19 @@ struct ContentView: View {
 }
 
 struct IncidentDetailView: View {
-    let incident: Incident
+    @Binding var incident: Incident
+    @State private var displayedNearbyCount: Int
+    @State private var displayedThanksCount: Int
+
+    init(incident: Binding<Incident>) {
+        self._incident = incident
+        self._displayedNearbyCount = State(
+            initialValue: incident.wrappedValue.nearbyCount ?? 0
+        )
+        self._displayedThanksCount = State(
+            initialValue: incident.wrappedValue.thanksCount ?? 0
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -180,10 +197,75 @@ struct IncidentDetailView: View {
                 )
             }
             .foregroundStyle(.secondary)
+            
+            Divider()
 
+            Text("Respond to your Circle")
+                .font(.headline)
+
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        do {
+                            try await APIService.shared.sendThanks(
+                                incidentId: incident.id
+                            )
+
+                            displayedThanksCount += 1
+
+                            print("Thanks sent")
+                        } catch {
+                            print("Thanks failed:", error)
+                        }
+                    }
+                } label: {
+                    Label("Thanks", systemImage: "hand.thumbsup.fill")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    Task {
+                        do {
+                            try await APIService.shared.markNearby(
+                                incidentId: incident.id
+                            )
+
+                            displayedNearbyCount += 1
+
+                            print("Nearby response sent")
+                        } catch {
+                            print("Nearby response failed:", error)
+                        }
+                    }
+                } label: {
+                    Label("I'm nearby", systemImage: "location.fill")
+                }
+                .buttonStyle(.bordered)
+            }
+            if displayedNearbyCount > 0 {
+                Text(
+                    "\(displayedNearbyCount) Circle member\(displayedNearbyCount == 1 ? "" : "s") nearby"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            if displayedThanksCount > 0 {
+                Text(
+                    "\(displayedThanksCount) \(displayedThanksCount == 1 ? "person" : "people") thanked this report"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Spacer()
         }
         .padding(24)
+        .onChange(of: incident.nearbyCount) { _, newValue in
+            displayedNearbyCount = newValue ?? 0
+        }
+        .onChange(of: incident.thanksCount) { _, newValue in
+            displayedThanksCount = newValue ?? 0
+        }
     }
 }
 
