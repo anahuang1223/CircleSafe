@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var activeWatchSession: WatchSession?
     @State private var myWatchSessionId: String?
     @State private var showingWatcherView = false
+    @State private var watchLocationManager = WatchLocationManager()
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(
@@ -102,6 +103,7 @@ struct ContentView: View {
                                     myWatchSessionId = session.id
                                     isWatchActive = true
                                     showingWatchSession = true
+                                    watchLocationManager.start()
                                 }
 
                                 print("Watch session started")
@@ -141,15 +143,43 @@ struct ContentView: View {
                 do {
                     incidents = try await APIService.shared.fetchIncidents()
                     let watchSession = try await APIService.shared.fetchActiveWatch()
+                    print(
+                        "RECEIVED WATCH LOCATION:",
+                        watchSession?.latitude as Any,
+                        watchSession?.longitude as Any
+                    )//debug
                     
-                    if watchSession?.id != activeWatchSession?.id {
-                        activeWatchSession = watchSession
-                        // The other person ended Watch Me
-                        if watchSession == nil {
-                            showingWatcherView = false
-                        }
+                    activeWatchSession = watchSession
+
+                    // The other person ended Watch Me
+                    if watchSession == nil {
+                        showingWatcherView = false
                     }
                     print("Refreshed \(incidents.count) incidents")
+                    //temp print test
+                    print(
+                        "WATCH DEBUG:",
+                        "active =", isWatchActive,
+                        "session =", myWatchSessionId ?? "nil",
+                        "location =", watchLocationManager.location?.description ?? "nil"
+                    )
+                    if isWatchActive,
+                       let sessionId = myWatchSessionId,
+                       let location = watchLocationManager.location {
+
+                        try await APIService.shared.updateWatchLocation(
+                            sessionId: sessionId,
+                            latitude: location.coordinate.latitude,
+                            longitude: location.coordinate.longitude
+                        )
+
+                        print(
+                            "Watch location sent:",
+                            location.coordinate.latitude,
+                            location.coordinate.longitude
+                        )
+                    }
+        
                 } catch {
                     print("Failed to refresh incidents:", error)
                 }
@@ -191,11 +221,9 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingWatcherView) {
-            if let session = activeWatchSession {
-                WatcherView(session: session)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
+            WatcherView(session: $activeWatchSession)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
 }
@@ -204,7 +232,6 @@ struct WatchSessionView: View {
     @Binding var isWatchActive: Bool
     @Binding var activeWatchSession: WatchSession?
     @Binding var myWatchSessionId: String?
-
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -253,23 +280,86 @@ struct WatchSessionView: View {
     }
 }
 struct WatcherView: View {
-    let session: WatchSession
-
+    @Binding var session: WatchSession?
+    @State private var locationHistory: [CLLocationCoordinate2D] = []
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Image(systemName: "eye.fill")
-                .font(.system(size: 48))
+                .font(.system(size: 42))
                 .foregroundStyle(.blue)
 
             Text("Watching Circle Member")
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("Their live location will appear here while Watch Me is active.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if let session,
+               let latitude = session.latitude,
+               let longitude = session.longitude {
+
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: latitude,
+                    longitude: longitude
+                )
+
+                Map(
+                    initialPosition: .region(
+                        MKCoordinateRegion(
+                            center: coordinate,
+                            span: MKCoordinateSpan(
+                                latitudeDelta: 0.01,
+                                longitudeDelta: 0.01
+                            )
+                        )
+                    )
+                ) {
+                    if locationHistory.count >= 2 {
+                        MapPolyline(coordinates: locationHistory)
+                            .stroke(.blue, lineWidth: 5)
+                    }
+                    
+                    Annotation(
+                        "Circle Member",
+                        coordinate: coordinate
+                    ) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.blue)
+                            .background(
+                                Circle()
+                                    .fill(.white)
+                            )
+                    }
+                }
+                .onChange(of: session.locationUpdatedAt) { _, _ in
+                    guard let latitude = session.latitude,
+                          let longitude = session.longitude else {
+                        return
+                    }
+
+                    let newCoordinate = CLLocationCoordinate2D(
+                        latitude: latitude,
+                        longitude: longitude
+                    )
+
+                    locationHistory.append(newCoordinate)
+                }
+                .frame(height: 350)
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 18)
+                )
+
+                Text("Live location")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+            } else {
+                ProgressView()
+
+                Text("Waiting for their location...")
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 

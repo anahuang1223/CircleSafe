@@ -114,5 +114,53 @@ router.post("/:id/end", async (req, res) => {
     });
   }
 });
+// Update location for an active Watch session
+router.post("/:id/location", async (req, res) => {
+  try {
+    const db = getDB();
+    const { latitude, longitude } = req.body;
 
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number"
+    ) {
+      return res.status(400).json({
+        error: "latitude and longitude are required"
+      });
+    }
+
+    const result = await db
+      .collection("watchSessions")
+      .findOneAndUpdate(
+        {
+          _id: new ObjectId(req.params.id),
+          status: "active"
+        },
+        {
+          $set: {
+            latitude,
+            longitude,
+            locationUpdatedAt: new Date()
+          }
+        },
+        {
+          returnDocument: "after"
+        }
+      );
+
+    if (!result) {
+      return res.status(404).json({
+        error: "Active Watch session not found"
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Failed to update Watch location:", error);
+
+    res.status(500).json({
+      error: "Failed to update Watch location"
+    });
+  }
+});
 export default router;
