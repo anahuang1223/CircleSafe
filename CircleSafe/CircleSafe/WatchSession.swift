@@ -10,7 +10,7 @@ struct WatchSession: Codable, Identifiable {
     let latitude: Double?
     let longitude: Double?
     let locationUpdatedAt: String?
-
+    let deviceId: String?
     enum CodingKeys: String, CodingKey {
         case id = "_id"
         case circleId
@@ -21,5 +21,6 @@ struct WatchSession: Codable, Identifiable {
         case latitude
         case longitude
         case locationUpdatedAt
+        case deviceId
     }
 }

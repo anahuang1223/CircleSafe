@@ -87,13 +87,23 @@ class APIService {
             throw URLError(.badServerResponse)
         }
     }
-    func startWatch() async throws -> WatchSession {
+    func startWatch(deviceId: String) async throws -> WatchSession {
         guard let url = URL(string: "\(baseURL)/api/watch/start") else {
             throw URLError(.badURL)
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        let body = [
+            "deviceId": deviceId
+        ]
+
+        request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -102,7 +112,10 @@ class APIService {
             throw URLError(.badServerResponse)
         }
 
-        return try JSONDecoder().decode(WatchSession.self, from: data)
+        return try JSONDecoder().decode(
+            WatchSession.self,
+            from: data
+        )
     }
 
     func fetchActiveWatch() async throws -> WatchSession? {

@@ -26,7 +26,22 @@ struct ContentView: View {
             )
         )
     )
-    
+    private let deviceId: String = {
+        if let existing = UserDefaults.standard.string(
+            forKey: "circleSafeDeviceId"
+        ) {
+            return existing
+        }
+
+        let newId = UUID().uuidString
+
+        UserDefaults.standard.set(
+            newId,
+            forKey: "circleSafeDeviceId"
+        )
+
+        return newId
+    }()
     var body: some View {
         ZStack {
             Map(position: $position) {
@@ -96,7 +111,10 @@ struct ContentView: View {
                     Button {
                         Task {
                             do {
-                                let session = try await APIService.shared.startWatch()
+                                let session = try await
+                                    APIService.shared.startWatch(
+                                        deviceId: deviceId
+                                    )
 
                                 await MainActor.run {
                                     activeWatchSession = session
@@ -121,7 +139,8 @@ struct ContentView: View {
                     }
                 }
                 if let session = activeWatchSession,
-                   session.id != myWatchSessionId {
+                   session.deviceId != nil,
+                   session.deviceId != deviceId {
 
                     Button {
                         showingWatcherView = true

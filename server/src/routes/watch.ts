@@ -10,7 +10,7 @@ const CIRCLE_ID = "roommates-demo";
 router.post("/start", async (req, res) => {
   try {
     const db = getDB();
-
+    const { deviceId } = req.body;
     // MVP: only one active Watch session per Circle
     await db.collection("watchSessions").updateMany(
       {
@@ -27,6 +27,7 @@ router.post("/start", async (req, res) => {
 
     const session = {
       circleId: CIRCLE_ID,
+      deviceId: deviceId ?? null,
       status: "active",
       startedAt: new Date(),
       endedAt: null,
